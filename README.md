@@ -8,31 +8,31 @@ This repository contains the R implementation and the scripts that reproduce the
 
 ## Idea in one line
 
-Replace the linear score of a soft-margin SVM with a deep network $f(\mathbf{x};\mathcal{W})$, smooth the hinge loss so the objective is differentiable, and place an (adaptive) group lasso on the input-layer weight columns so that entire input features are driven to exactly zero.
+Replace the linear score of a soft-margin SVM with a deep network *f*(**x**; **W**), smooth the hinge loss so the objective is differentiable, and place an (adaptive) group lasso on the input-layer weight columns so that entire input features are driven to exactly zero.
 
 ---
 
 ## Model
 
-A multilayer perceptron with $L-1$ hidden layers maps $\mathbf{x}\in\mathbb{R}^{p}$ to a scalar score
+A multilayer perceptron with *L* − 1 hidden layers maps **x** ∈ ℝ<sup>*p*</sup> to a scalar score
 
-$$
+```math
 \mathbf{h}^{(\ell)}(\mathbf{x}) = \sigma_\ell\left(\mathbf{W}^{(\ell)}\mathbf{h}^{(\ell-1)}(\mathbf{x}) + \mathbf{b}^{(\ell)}\right),
 \qquad
-f(\mathbf{x};\mathcal{W}) = \left(\mathbf{w}^{(L)}\right)^{\top}\mathbf{h}^{(L-1)}(\mathbf{x}) + b^{(L)} ,
-$$
+f(\mathbf{x};\mathcal{W}) = \left(\mathbf{w}^{(L)}\right)^{\top}\mathbf{h}^{(L-1)}(\mathbf{x}) + b^{(L)},
+```
 
-with $\mathbf{h}^{(0)}=\mathbf{x}$ and $\mathcal{W}=\lbrace \mathbf{W}^{(\ell)},\mathbf{b}^{(\ell)} \rbrace$. The activation $\sigma_\ell$ is twice continuously differentiable with bounded first and second derivatives (e.g. the hyperbolic tangent). The predicted label is $\mathrm{sign}\, f(\mathbf{x};\mathcal{W})$.
+with **h**<sup>(0)</sup> = **x** and **W** = { **W**<sup>(ℓ)</sup>, **b**<sup>(ℓ)</sup> }. The activation σ<sub>ℓ</sub> is twice continuously differentiable with bounded first and second derivatives (e.g. the hyperbolic tangent). The predicted label is sign *f*(**x**; **W**).
 
-The first-layer weight matrix is grouped by input feature: $\mathbf{w}^{(1)}_{\cdot,j}$ is the column of $\mathbf{W}^{(1)}$ connecting feature $x_j$ to the first hidden layer. Sending $\mathbf{w}^{(1)}_{\cdot,j}=\mathbf{0}$ removes $x_j$ from the model entirely.
+The first-layer weight matrix is grouped by input feature: **w**<sup>(1)</sup><sub>·,j</sub> is the column of **W**<sup>(1)</sup> connecting feature *x*<sub>*j*</sub> to the first hidden layer. Sending **w**<sup>(1)</sup><sub>·,j</sub> = **0** removes *x*<sub>*j*</sub> from the model entirely.
 
 ---
 
 ## Smoothed hinge loss
 
-The hinge loss $\phi_H(u)=(1-u)_+$ is nondifferentiable at $u=1$. Convolving it with a uniform kernel $K_h(v)=\frac{1}{2h}\mathbf{1}(|v|\le h)$ gives a closed-form smoothed surrogate with bandwidth $h>0$:
+The hinge loss φ<sub>H</sub>(*u*) = (1 − *u*)<sub>+</sub> is nondifferentiable at *u* = 1. Convolving it with a uniform kernel *K*<sub>h</sub>(*v*) = (1 / 2*h*) · **1**(|*v*| ≤ *h*) gives a closed-form smoothed surrogate with bandwidth *h* > 0:
 
-$$
+```math
 \phi_{H,h}(u) =
 \begin{cases}
 1 - u, & u \le 1-h, \\
@@ -46,9 +46,9 @@ $$
 -\dfrac{1-u+h}{2h}, & |u-1| < h, \\
 0, & u \ge 1+h.
 \end{cases}
-$$
+```
 
-It is $1$-Lipschitz, convex, and recovers the hinge as $h\to 0$, which makes the whole objective amenable to gradient-based training.
+It is 1-Lipschitz, convex, and recovers the hinge as *h* → 0, which makes the whole objective amenable to gradient-based training.
 
 ---
 
@@ -56,53 +56,53 @@ It is $1$-Lipschitz, convex, and recovers the hinge as $h\to 0$, which makes the
 
 PDSVM minimizes the smoothed empirical risk plus a first-layer group penalty and an upper-layer ridge penalty:
 
-$$
+```math
 Q_n(\mathcal{W}) =
 \frac{1}{n}\sum_{i=1}^{n}\phi_{H,h}\left(y_i\, f(\mathbf{x}_i;\mathcal{W})\right)
 + \lambda_1 \sum_{j=1}^{p} \hat{w}_j\left\|\mathbf{w}^{(1)}_{\cdot,j}\right\|_2
 + \lambda_2 \sum_{\ell=2}^{L}\left\|\mathbf{W}^{(\ell)}\right\|_F^{2}.
-$$
+```
 
-The first term is the smooth data-fit $F(\mathcal{W})$, and the remaining two terms are the penalties.
+The first term is the smooth data-fit *F*(**W**), and the remaining two terms are the penalties.
 
-- $\lambda_1$ controls feature sparsity through the group lasso on first-layer columns.
-- $\lambda_2$ is a ridge on the upper layers for stability.
-- The adaptive weights $\hat{w}_j = \left(\left\|\widetilde{\mathbf{w}}^{(1)}_{\cdot,j}\right\|_2 + \varepsilon_n\right)^{-\gamma}$ are computed from an unpenalized pilot fit (with $\gamma=1$). Setting $\hat{w}_j \equiv 1$ recovers the plain group lasso.
+- λ₁ controls feature sparsity through the group lasso on first-layer columns.
+- λ₂ is a ridge on the upper layers for stability.
+- The adaptive weights ŵ<sub>*j*</sub> = ( ‖pilot column *j*‖<sub>2</sub> + ε<sub>n</sub> )<sup>−γ</sup> are computed from an unpenalized pilot fit (with γ = 1). Setting ŵ<sub>*j*</sub> ≡ 1 recovers the plain group lasso.
 
 ---
 
 ## Optimization: proximal gradient descent
 
-The objective splits into a smooth part $F$ and a nonsmooth separable penalty. Proximal gradient descent alternates a gradient step on $F$ with a closed-form proximal step on the first-layer columns:
+The objective splits into a smooth part *F* and a nonsmooth separable penalty. Proximal gradient descent alternates a gradient step on *F* with a closed-form proximal step on the first-layer columns:
 
-$$
+```math
 \mathcal{W}^{t+1/2} = \mathcal{W}^{t} - \eta\, \nabla F(\mathcal{W}^{t}),
 \qquad
 \mathbf{w}^{(1),\, t+1}_{\cdot,j} = \mathcal{S}_{\eta \lambda_1 \hat{w}_j}\left(\mathbf{w}^{(1),\, t+1/2}_{\cdot,j}\right),
-$$
+```
 
 where the group-soft-thresholding (block) operator is
 
-$$
+```math
 \mathcal{S}_{\tau}(\mathbf{u}) = \left(1 - \frac{\tau}{\|\mathbf{u}\|_2}\right)_{+}\mathbf{u}.
-$$
+```
 
-The proximal step yields **exact zeros**, so selection is read directly from the fitted weights: $\left\|\mathbf{w}^{(1)}_{\cdot,j}\right\|_2 = 0$ means feature $j$ is excluded, with no post-hoc thresholding required.
+The proximal step yields **exact zeros**, so selection is read directly from the fitted weights: ‖**w**<sup>(1)</sup><sub>·,j</sub>‖<sub>2</sub> = 0 means feature *j* is excluded, with no post-hoc thresholding required.
 
 ---
 
 ## Theory (informal)
 
-Let $\mathcal{R}(f) = \mathbb{P}\left(Y \neq \mathrm{sign}\, f(\mathbf{X})\right)$ be the misclassification risk and $\mathcal{R}^{\ast}$ its infimum. For an $\varepsilon_{\mathrm{opt},n}$-approximate minimizer $\widehat{f}$, with probability at least $1-\delta$,
+Let *R*(*f*) = ℙ( *Y* ≠ sign *f*(**X**) ) be the misclassification risk and *R*\* its infimum. For an approximate minimizer with optimization tolerance ε<sub>opt,n</sub>, with probability at least 1 − δ,
 
-$$
+```math
 \mathcal{R}(\widehat{f}) - \mathcal{R}^{\ast}
 \le
 C\left[\mathrm{Rad}_n(\mathcal{F}_{\mathrm{NN}}) + B_{\Omega,h}\sqrt{\frac{\log(1/\delta)}{n}}\right]
 + \frac{h}{2} + \widehat{\mathcal{A}}_{\mathrm{reg}} + \varepsilon_{\mathrm{opt},n}.
-$$
+```
 
-The bound separates four sources of error: the empirical-process complexity $\mathrm{Rad}_n(\mathcal{F}_{\mathrm{NN}}) = O(n^{-1/2})$, the $O(h)$ smoothing bias, the regularized approximation error $\widehat{\mathcal{A}}_{\mathrm{reg}}$, and the optimization tolerance $\varepsilon_{\mathrm{opt},n}$. The smoothed hinge is Fisher consistent, so minimizing the surrogate is aligned with the Bayes rule up to the $O(h)$ bias.
+The bound separates four sources of error: the empirical-process complexity Rad<sub>n</sub>(ℱ<sub>NN</sub>) = O(*n*<sup>−1/2</sup>), the O(*h*) smoothing bias, the regularized approximation error, and the optimization tolerance ε<sub>opt,n</sub>. The smoothed hinge is Fisher consistent, so minimizing the surrogate is aligned with the Bayes rule up to the O(*h*) bias.
 
 ---
 
@@ -152,7 +152,7 @@ fit <- PDSVM3_val(
 selected <- pdsvm_selected_features(fit, sel_thresh = 1e-5)$selected
 ```
 
-Hyperparameters ($h$, learning rate, $\lambda_1$, $\lambda_2$) are chosen by validation accuracy; see the simulation and real-data scripts for the full tuning pipelines.
+Hyperparameters (*h*, learning rate, λ₁, λ₂) are chosen by validation accuracy; see the simulation and real-data scripts for the full tuning pipelines.
 
 ---
 
