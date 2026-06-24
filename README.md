@@ -122,14 +122,14 @@ The bound separates four sources of error: the empirical-process complexity Rad<
 ## Repository layout
 
 ```
-Deep_SVM_v6.R                 # core: smoothed hinge, proximal operator,
+Deep_SVM_vf.R                 # core: smoothed hinge, proximal operator,
                               #       forward/backward pass, training routines
-fn_variable_selection_M1.R    # simulation: high-dimensional interaction signal (p > n)
-fn_variable_selection_M4.R    # simulation: additive nonlinear model (appendix)
+fn_variable_selection_M1_vf.R    # simulation: high-dimensional interaction signal (p > n)
+fn_variable_selection_M2_vf.R    # simulation: additive nonlinear model (appendix)
 DSVM_table1_ex1_vf.R          # simulation: nonlinear boundary + label-noise robustness
-theorems_visualization.R      # empirical illustration of the risk bound and PGD behavior
-02_celeba_local_parallel.R    # real data: CelebA eyeglasses (image features)
-parkinsons_pdsvm.R            # real data: Parkinson's speech features
+fn_theorems_visualization_vf.R      # empirical illustration of the risk bound and PGD behavior
+fn_realdata_celeba_vf.R    # real data: CelebA eyeglasses (image features)
+fn_realdata_parkinsons_vf.R            # real data: Parkinson's speech features
 ```
 
 ---
@@ -137,7 +137,7 @@ parkinsons_pdsvm.R            # real data: Parkinson's speech features
 ## Quick start
 
 ```r
-source("Deep_SVM_v6.R")
+source("Deep_SVM_vf.R")
 
 # X has a leading column of 1s for the bias; y in {-1, +1} or {0, 1}.
 fit <- PDSVM3_val(
